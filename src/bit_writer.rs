@@ -1,6 +1,9 @@
 #![allow(unused)]
 
 use core::fmt;
+
+use serde::{Deserialize, Serialize};
+#[derive(Serialize, Deserialize)]
 pub struct Code {
     data: usize,
     len: u8,
@@ -12,6 +15,7 @@ impl Code {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct BitHandler {
     data: Vec<u8>,
     len: usize,
@@ -19,7 +23,8 @@ pub struct BitHandler {
 
 impl BitHandler {
     pub fn new(data: Vec<u8>) -> Self {
-        Self { data, len: 0 }
+        let len = data.len() * 8;
+        Self { data, len }
     }
 
     pub fn is_empty(&self) -> bool {

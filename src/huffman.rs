@@ -1,8 +1,18 @@
 #![allow(unused)]
-use std::collections::{BinaryHeap, HashMap};
+use std::{
+    collections::{BinaryHeap, HashMap},
+    fs::File,
+    hash::Hash,
+    io::{BufRead, BufReader, Read, Write},
+    os::unix::fs::FileExt,
+};
+
+use serde::{Deserialize, Serialize};
+use serde_cbor::{from_slice, ser::to_vec_packed};
 
 use crate::bit_writer::{BitHandler, Code};
 
+#[derive(Serialize, Deserialize)]
 struct NodeRaw {
     left: Node,
     right: Node,
@@ -29,6 +39,7 @@ impl Ord for NodeRaw {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Codec {
     root: Node,
     symbol_map: HashMap<char, Code>,
@@ -42,7 +53,7 @@ impl Codec {
         }
     }
 
-    pub fn encode(&mut self, input: String) -> BitHandler {
+    pub fn encode(&mut self, input: &String) -> BitHandler {
         // get frequency of each char
         let mut freq = HashMap::new();
         input.chars().for_each(|c| {
@@ -78,7 +89,7 @@ impl Codec {
     }
 
     pub fn decode(&self, input: &mut BitHandler) -> String {
-        assert!(self.root.is_some() && self.symbol_map.len() != 0);
+        assert!(self.root.is_some());
         let mut a = self.root.as_ref().unwrap().as_ref();
         let mut res = "".to_string();
         while !input.is_empty() {
@@ -94,6 +105,43 @@ impl Codec {
             }
         }
         res.chars().into_iter().rev().collect()
+    }
+
+    pub fn persist_to_file(&self, output: &BitHandler) {
+        let mut file = File::create("compression.huff").unwrap();
+        let mut header = to_vec_packed(&self.root).unwrap();
+        let mut header_len: Vec<u8> = format!("{}", header.len())
+            .chars()
+            .map(|c| c as u8)
+            .collect();
+        header_len.push(b'\0');
+        header_len.extend(header);
+        let data = to_vec_packed(output).unwrap();
+        header_len.extend(data);
+        file.write_all(&header_len);
+    }
+
+    pub fn decode_from_file(file_name: &str) -> String {
+        let mut file = File::open(file_name).unwrap();
+        let mut file = BufReader::new(file);
+        let mut header_len: Vec<u8> = vec![];
+        file.read_until(b'\0', &mut header_len).unwrap();
+        header_len.pop();
+        let header_len: String = header_len.iter().map(|n| *n as char).collect();
+        let header_len = header_len.parse::<usize>().unwrap();
+
+        let mut buf = vec![0; header_len];
+        file.read_exact(&mut buf).unwrap();
+        let root: Node = from_slice(&buf).unwrap();
+        let codec = Codec {
+            root,
+            symbol_map: HashMap::new(),
+        };
+        let mut data: Vec<u8> = vec![];
+        file.read_to_end(&mut data);
+        let mut data: BitHandler = from_slice(&data).unwrap();
+        let res = codec.decode(&mut data);
+        res
     }
 
     fn pollute_symbol_map(node: &Node, map: &mut HashMap<char, Code>, depth: u8, code: usize) {
@@ -132,14 +180,34 @@ impl Codec {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        fs::File,
+        io::{Read, Write},
+    };
+
     use super::*;
 
     #[test]
     fn test_encode() {
         let input = "hello world".to_string();
         let mut codec = Codec::new();
-        let mut handler = codec.encode(input);
+        let mut handler = codec.encode(&input);
         let res = codec.decode(&mut handler);
         assert_eq!(res, "hello world");
+    }
+
+    #[test]
+    fn test_hlm() {
+        let mut file = File::open("hlm.txt").unwrap();
+        let mut input = "".to_string();
+        file.read_to_string(&mut input);
+
+        let mut codec = Codec::new();
+        let mut handler = codec.encode(&input);
+
+        codec.persist_to_file(&handler);
+
+        let res = Codec::decode_from_file("compression.huff");
+        assert_eq!(res, input);
     }
 }
