@@ -1,6 +1,7 @@
 #![allow(unused)]
 
 use core::fmt;
+use std::collections::LinkedList;
 
 use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
@@ -17,58 +18,83 @@ impl Code {
 
 #[derive(Serialize, Deserialize)]
 pub struct BitHandler {
-    data: Vec<u8>,
+    data: LinkedList<u8>,
     len: usize,
+    read: u8,
 }
 
 impl BitHandler {
-    pub fn new(data: Vec<u8>) -> Self {
+    pub fn new(data: LinkedList<u8>) -> Self {
         let len = data.len() * 8;
-        Self { data, len }
+        Self { data, len, read: 0 }
     }
 
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 
-    pub fn read_bit(&mut self) -> Option<bool> {
+    pub fn read_bit_front(&mut self) -> Option<bool> {
         if self.len == 0 {
             return None;
         }
         self.len -= 1;
-        let top = self.data.pop().unwrap();
-        let offset = self.len % 8;
-        let res = top & (1 << offset) != 0;
-        if self.len % 8 != 0 {
-            self.data.push(top);
+        self.read = (self.read + 1) % 8;
+        let top = self.data.pop_front().unwrap();
+        let res = top & 1 != 0;
+        if self.read % 8 != 0 {
+            self.data.push_front(top >> 1);
         }
         Some(res)
     }
 
-    pub fn write_bit(&mut self, bit: bool) {
+    pub fn read_bit_back(&mut self) -> Option<bool> {
+        if self.len == 0 {
+            return None;
+        }
+        self.len -= 1;
+        let top = self.data.pop_back().unwrap();
+        let offset = self.len % 8;
+        let res = top & (1 << offset) != 0;
+        if self.len % 8 != 0 {
+            self.data.push_back(top);
+        }
+        Some(res)
+    }
+
+    pub fn write_bit_back(&mut self, bit: bool) {
         if self.len % 8 == 0 {
-            self.data.push(0);
+            self.data.push_back(0);
         }
         if bit {
             let offset = self.len % 8;
-            let top = self.data.pop().unwrap();
-            self.data.push(top | (1 << offset));
+            let top = self.data.pop_back().unwrap();
+            self.data.push_back(top | (1 << offset));
         }
         self.len += 1;
     }
 
     pub fn write_code(&mut self, code: &Code) {
         // NOTE: we have to reverse the code before writing
+        for i in (0..code.len) {
+            if code.data & (1 << i) != 0 {
+                self.write_bit_back(true);
+            } else {
+                self.write_bit_back(false);
+            }
+        }
+    }
+    pub fn write_code_rev(&mut self, code: &Code) {
+        // NOTE: we have to reverse the code before writing
         for i in (0..code.len).rev() {
             if code.data & (1 << i) != 0 {
-                self.write_bit(true);
+                self.write_bit_back(true);
             } else {
-                self.write_bit(false);
+                self.write_bit_back(false);
             }
         }
     }
 
-    pub fn as_vec(self) -> Vec<u8> {
+    pub fn as_vec(self) -> LinkedList<u8> {
         self.data
     }
 }
@@ -92,7 +118,7 @@ impl fmt::Debug for BitHandler {
 
 impl fmt::Debug for Code {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s: String = format!("{:08b}", self.data)
+        let s: String = format!("{:032b}", self.data)
             .chars()
             .into_iter()
             .rev()
@@ -107,39 +133,65 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_read_front() {
+        let mut handler = BitHandler::new(LinkedList::new());
+        handler.write_code(&Code { data: 97, len: 8 }); //
+        handler.write_code(&Code { data: 229, len: 8 }); // 10100111
+        handler.write_code(&Code { data: 1, len: 1 }); // 10100111
+        assert_eq!(handler.read_bit_front().unwrap(), true);
+        assert_eq!(handler.read_bit_front().unwrap(), false);
+        assert_eq!(handler.read_bit_front().unwrap(), false);
+        assert_eq!(handler.read_bit_front().unwrap(), false);
+        assert_eq!(handler.read_bit_front().unwrap(), false);
+        assert_eq!(handler.read_bit_front().unwrap(), true);
+        assert_eq!(handler.read_bit_front().unwrap(), true);
+        assert_eq!(handler.read_bit_front().unwrap(), false);
+        assert_eq!(handler.read_bit_front().unwrap(), true);
+        assert_eq!(handler.read_bit_front().unwrap(), false);
+        assert_eq!(handler.read_bit_front().unwrap(), true);
+        assert_eq!(handler.read_bit_front().unwrap(), false);
+        assert_eq!(handler.read_bit_front().unwrap(), false);
+        assert_eq!(handler.read_bit_front().unwrap(), true);
+        assert_eq!(handler.read_bit_front().unwrap(), true);
+        assert_eq!(handler.read_bit_front().unwrap(), true);
+        assert_eq!(handler.read_bit_front().unwrap(), true);
+        assert_eq!(handler.read_bit_front(), None);
+    }
+    #[test]
     fn test_read() {
         let mut handler = BitHandler {
-            data: vec![0, 5],
+            data: LinkedList::from_iter(vec![0, 5]),
             len: 11,
+            read: 0,
         };
-        assert_eq!(handler.read_bit().unwrap(), true);
-        assert_eq!(handler.read_bit().unwrap(), false);
-        assert_eq!(handler.read_bit().unwrap(), true);
-        assert_eq!(handler.read_bit().unwrap(), false);
-        assert_eq!(handler.read_bit().unwrap(), false);
-        assert_eq!(handler.read_bit().unwrap(), false);
-        assert_eq!(handler.read_bit().unwrap(), false);
-        assert_eq!(handler.read_bit().unwrap(), false);
-        assert_eq!(handler.read_bit().unwrap(), false);
-        assert_eq!(handler.read_bit().unwrap(), false);
-        assert_eq!(handler.read_bit().unwrap(), false);
-        assert_eq!(handler.read_bit(), None);
+        assert_eq!(handler.read_bit_back().unwrap(), true);
+        assert_eq!(handler.read_bit_back().unwrap(), false);
+        assert_eq!(handler.read_bit_back().unwrap(), true);
+        assert_eq!(handler.read_bit_back().unwrap(), false);
+        assert_eq!(handler.read_bit_back().unwrap(), false);
+        assert_eq!(handler.read_bit_back().unwrap(), false);
+        assert_eq!(handler.read_bit_back().unwrap(), false);
+        assert_eq!(handler.read_bit_back().unwrap(), false);
+        assert_eq!(handler.read_bit_back().unwrap(), false);
+        assert_eq!(handler.read_bit_back().unwrap(), false);
+        assert_eq!(handler.read_bit_back().unwrap(), false);
+        assert_eq!(handler.read_bit_back(), None);
     }
 
     #[test]
     fn test_write() {
-        let mut handler = BitHandler::new(vec![]);
-        handler.write_bit(true);
-        handler.write_bit(false);
-        handler.write_bit(true);
-        handler.write_bit(false);
+        let mut handler = BitHandler::new(LinkedList::new());
+        handler.write_bit_back(true);
+        handler.write_bit_back(false);
+        handler.write_bit_back(true);
+        handler.write_bit_back(false);
         assert_eq!(handler.len, 4);
-        assert_eq!(handler.data[0], 5);
+        assert_eq!(handler.data.front().unwrap(), &5);
 
-        assert_eq!(handler.read_bit().unwrap(), false);
-        assert_eq!(handler.read_bit().unwrap(), true);
-        assert_eq!(handler.read_bit().unwrap(), false);
-        assert_eq!(handler.read_bit().unwrap(), true);
-        assert_eq!(handler.read_bit(), None);
+        assert_eq!(handler.read_bit_back().unwrap(), false);
+        assert_eq!(handler.read_bit_back().unwrap(), true);
+        assert_eq!(handler.read_bit_back().unwrap(), false);
+        assert_eq!(handler.read_bit_back().unwrap(), true);
+        assert_eq!(handler.read_bit_back(), None);
     }
 }

@@ -1,0 +1,28 @@
+graph {
+511[label="5",shape="circle",xlabel="511",]
+510[label="2 | a",shape="record",xlabel="510",]
+509[label="3",shape="circle",xlabel="509",]
+508[label="1 | r",shape="record",xlabel="508",]
+507[label="2",shape="circle",xlabel="507",]
+505[label="1",shape="circle",xlabel="505",]
+503[label="0 | NYT",shape="record",xlabel="503",]
+504[label="1 | v",shape="record",xlabel="504",]
+506[label="1 | d",shape="record",xlabel="506",]
+511 -- 510
+511 -- 509
+
+
+509 -- 508
+509 -- 507
+
+
+507 -- 505
+507 -- 506
+
+505 -- 503
+505 -- 504
+
+
+
+
+}
