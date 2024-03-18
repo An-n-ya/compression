@@ -245,7 +245,7 @@ impl Codec {
             let code = Self::code_from_node(self.nyt.clone());
             #[cfg(test)]
             println!("write nyt, code: {code:?}");
-            handler.write_code(&code);
+            handler.write_code_rev(&code);
 
             let node = self.new_node(symbol);
             self.symbol_map.insert(symbol, node.clone());

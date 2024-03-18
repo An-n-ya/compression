@@ -6,8 +6,13 @@ pub trait GraphViz {
     fn node_attribute(&self) -> String;
     fn edge(&self) -> String;
     fn child(&self) -> Vec<Box<impl GraphViz>>;
-    fn draw(&self, file_name: &str) {
+    fn draw_to_file(&self, file_name: &str) {
         let mut file = File::create(file_name).unwrap();
+        let script = self.draw_to_string();
+        write!(file, "{script}").unwrap();
+    }
+
+    fn draw_to_string(&self) -> String {
         let mut node_attributes = vec![self.node_attribute()];
         let mut edges = vec![self.edge()];
 
@@ -34,6 +39,6 @@ pub trait GraphViz {
         let edges = edges.join("\n");
         script += &edges;
         script.push_str("\n}");
-        write!(file, "{script}").unwrap();
+        script
     }
 }
