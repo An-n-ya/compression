@@ -4,6 +4,7 @@ use std::{
     collections::{BinaryHeap, HashMap, LinkedList},
     fs::File,
     io::Write,
+    os::unix::fs::FileExt,
     ptr,
 };
 
@@ -203,9 +204,12 @@ impl Node {
         self.weight() == 0
     }
 
-    pub fn exchange(&mut self, other: Node) {
+    pub fn exchange(&mut self, mut other: Node) {
         let mut other_parent = other.parent();
         let mut self_parent = self.parent();
+        let (self_number, other_number) = (self.number(), other.number());
+        self.set_number(other_number);
+        other.set_number(self_number);
         if other.is_left_child() {
             other_parent.set_left(self.clone())
         } else {
@@ -239,14 +243,14 @@ impl Codec {
             let node = self.symbol_map.get(&symbol).unwrap().clone();
             let code = Self::code_from_node(node.clone());
 
-            #[cfg(test)]
-            println!("write symbol: {}, code: {code:?}", node.symbol().unwrap());
-            handler.write_code(&code);
+            // #[cfg(test)]
+            // println!("write symbol: {}, code: {code:?}", node.symbol().unwrap());
+            handler.write_code_rev(&code);
             self.update_node(node);
         } else {
             let code = Self::code_from_node(self.nyt.clone());
-            #[cfg(test)]
-            println!("write nyt, code: {code:?}");
+            // #[cfg(test)]
+            // println!("write nyt, code: {code:?}");
             handler.write_code_rev(&code);
 
             let node = self.new_node(symbol);
@@ -254,8 +258,8 @@ impl Codec {
 
             let code = self.code_from_symbol(symbol);
 
-            #[cfg(test)]
-            println!("write symbol: {}, code: {code:?}", symbol);
+            // #[cfg(test)]
+            // println!("write symbol: {}, code: {code:?}", symbol);
             handler.write_code(&code);
             self.update_node(node);
         }
@@ -269,11 +273,13 @@ impl Codec {
         let mut buffer: Vec<u8> = vec![];
         for c in input.chars() {
             self.write_symbol(c, &mut handler);
-            #[cfg(test)]
-            {
-                let script = self.root.draw_to_string();
-                writeln!(buffer, "{script}");
-            }
+            // #[cfg(test)]
+            // {
+            //     let script = self.root.draw_to_string();
+            //     writeln!(buffer, "{script}");
+            //     // file.write_at(&buffer, 0);
+            //     // file.write(&buffer);
+            // }
         }
         #[cfg(test)]
         {
@@ -285,11 +291,22 @@ impl Codec {
     pub fn decode(&mut self, handler: &mut BitHandler) -> String {
         let mut res = "".to_string();
         let mut node = self.root.clone();
+        let mut path = "".to_string();
+        #[cfg(test)]
+        let mut file = File::create("tree_decode.dot").unwrap();
+        #[cfg(test)]
+        let mut buffer: Vec<u8> = vec![];
         while !handler.is_empty() {
             if !node.is_leaf() {
                 match handler.read_bit_front().unwrap() {
-                    true => node = node.right(),
-                    false => node = node.left(),
+                    true => {
+                        node = node.right();
+                        path.push('1');
+                    }
+                    false => {
+                        node = node.left();
+                        path.push('0');
+                    }
                 }
             } else {
                 if node.is_nyt() {
@@ -297,6 +314,9 @@ impl Codec {
                     for i in 0..32 {
                         if handler.read_bit_front().unwrap() {
                             num |= (1 << i);
+                            path.push('1');
+                        } else {
+                            path.push('0');
                         }
                     }
                     let symbol = char::from_u32(num).unwrap();
@@ -306,11 +326,19 @@ impl Codec {
                     let symbol = node.symbol().unwrap();
                     res.push(symbol);
                 }
-                println!("res: {res}");
+                // println!("read symbol: {res}, consume: {path}");
+                path = "".to_string();
                 self.update_node(node.clone());
                 node = self.root.clone();
+                // #[cfg(test)]
+                // {
+                //     let script = self.root.draw_to_string();
+                //     writeln!(buffer, "{script}");
+                // }
             }
         }
+        #[cfg(test)]
+        file.write(&buffer);
         if node.is_leaf() && !node.is_nyt() {
             res.push(node.symbol().unwrap());
         }
@@ -394,19 +422,9 @@ impl Codec {
         let p = node.parent();
         let heap = self.block.get_mut(&weight).unwrap();
         let max_node = heap.pop().unwrap();
-        if node == max_node {
+        if node == max_node || p == max_node {
             heap.push(max_node);
             return None;
-        } else if p == max_node {
-            let second_max_node = heap.pop().unwrap();
-            heap.push(max_node);
-            if second_max_node == node {
-                heap.push(second_max_node);
-                return None;
-            } else {
-                heap.push(second_max_node.clone());
-                return Some(second_max_node);
-            }
         } else {
             heap.push(max_node.clone());
             return Some(max_node.clone());
@@ -445,6 +463,8 @@ impl Drop for Codec {
 }
 #[cfg(test)]
 mod tests {
+    use std::io::Read;
+
     use super::*;
 
     #[test]
@@ -464,7 +484,21 @@ mod tests {
     #[test]
     fn test_adaptive_huffman() {
         let mut codec = Codec::new();
-        let input = "aardvss".to_string();
+        let input = "aardvsffwafsfssdfasfadsgsdgsdfgfsdg".to_string();
+        let mut handler = codec.encode(&input);
+        println!("{handler:?}");
+        let mut codec = Codec::new();
+        let res = codec.decode(&mut handler);
+        assert_eq!(input, res);
+    }
+
+    #[test]
+    fn test_hlm() {
+        let mut file = File::open("hlm.txt").unwrap();
+        let mut input = "".to_string();
+        file.read_to_string(&mut input);
+        input.truncate(3001);
+        let mut codec = Codec::new();
         let mut handler = codec.encode(&input);
         println!("{handler:?}");
         let mut codec = Codec::new();
