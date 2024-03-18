@@ -2,6 +2,8 @@
 
 use std::{
     collections::{BinaryHeap, HashMap, LinkedList},
+    fs::File,
+    io::Write,
     ptr,
 };
 
@@ -222,7 +224,7 @@ impl Node {
 }
 
 impl Codec {
-    pub fn new(symbol_size: usize) -> Self {
+    pub fn new() -> Self {
         let nyt = Node::new(u32::MAX as usize);
         Self {
             block: HashMap::new(),
@@ -261,8 +263,21 @@ impl Codec {
 
     pub fn encode(&mut self, input: &String) -> BitHandler {
         let mut handler = BitHandler::new(LinkedList::new());
+        #[cfg(test)]
+        let mut file = File::create("tree.dot").unwrap();
+        #[cfg(test)]
+        let mut buffer: Vec<u8> = vec![];
         for c in input.chars() {
             self.write_symbol(c, &mut handler);
+            #[cfg(test)]
+            {
+                let script = self.root.draw_to_string();
+                writeln!(buffer, "{script}");
+            }
+        }
+        #[cfg(test)]
+        {
+            file.write(&buffer);
         }
         handler
     }
@@ -295,6 +310,9 @@ impl Codec {
                 self.update_node(node.clone());
                 node = self.root.clone();
             }
+        }
+        if node.is_leaf() && !node.is_nyt() {
+            res.push(node.symbol().unwrap());
         }
         res
     }
@@ -445,10 +463,11 @@ mod tests {
 
     #[test]
     fn test_adaptive_huffman() {
-        let mut codec = Codec::new(256);
-        let input = "aardv".to_string();
+        let mut codec = Codec::new();
+        let input = "aardvss".to_string();
         let mut handler = codec.encode(&input);
-        let mut codec = Codec::new(256);
+        println!("{handler:?}");
+        let mut codec = Codec::new();
         let res = codec.decode(&mut handler);
         assert_eq!(input, res);
     }
