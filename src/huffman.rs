@@ -10,7 +10,10 @@ use std::{
 use serde::{Deserialize, Serialize};
 use serde_cbor::{from_slice, ser::to_vec_packed};
 
-use crate::bit_writer::{BitHandler, Code};
+use crate::{
+    bit_writer::{BitHandler, Code},
+    utils::freq_of_str,
+};
 
 #[derive(Serialize, Deserialize)]
 struct NodeRaw {
@@ -54,12 +57,8 @@ impl Codec {
     }
 
     pub fn encode(&mut self, input: &String) -> BitHandler {
+        let freq = freq_of_str(&input);
         // get frequency of each char
-        let mut freq = HashMap::new();
-        input.chars().for_each(|c| {
-            freq.insert(c, freq.get(&c).unwrap_or(&0) + 1);
-        });
-        let freq: Vec<(char, usize)> = freq.iter().map(|(&k, &v)| (k, v)).collect();
         let symbol_size = freq.len();
 
         // make huffman tree
