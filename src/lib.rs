@@ -4,3 +4,4 @@ mod bit_io;
 mod graph_viz;
 mod huffman;
 mod utils;
+mod deflate;

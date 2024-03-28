@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+crc32fast = "1.4.0"
 serde = { version = "1.0.197", features = ["derive"] }
 serde_cbor = "0.10"

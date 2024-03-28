@@ -1,7 +1,7 @@
 #![allow(unused)]
 
 use core::fmt;
-use std::collections::LinkedList;
+use std::{collections::LinkedList, io::BufReader};
 
 use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
@@ -79,7 +79,19 @@ impl BitIO {
         Some(res)
     }
 
-    pub fn write_bit_back(&mut self, bit: bool) {
+    pub fn write_bit_back_to_msb(&mut self, bit: bool) {
+        if self.len % 8 == 0 {
+            self.data.push_back(0);
+        }
+        if bit {
+            let offset = 7 - self.len % 8;
+            let top = self.data.pop_back().unwrap();
+            self.data.push_back(top | (1 << offset));
+        }
+        self.len += 1;
+    }
+
+    pub fn write_bit_back_to_lsb(&mut self, bit: bool) {
         if self.len % 8 == 0 {
             self.data.push_back(0);
         }
@@ -91,13 +103,24 @@ impl BitIO {
         self.len += 1;
     }
 
+    pub fn write_code_to_msb(&mut self, code: &Code) {
+        // NOTE: we have to reverse the code before writing
+        for i in (0..code.len).rev() {
+            if usize::from(code.data) & (1 << i) != 0 {
+                self.write_bit_back_to_msb(true);
+            } else {
+                self.write_bit_back_to_msb(false);
+            }
+        }
+    }
+
     pub fn write_code(&mut self, code: &Code) {
         // NOTE: we have to reverse the code before writing
         for i in (0..code.len) {
             if usize::from(code.data) & (1 << i) != 0 {
-                self.write_bit_back(true);
+                self.write_bit_back_to_lsb(true);
             } else {
-                self.write_bit_back(false);
+                self.write_bit_back_to_lsb(false);
             }
         }
     }
@@ -105,41 +128,91 @@ impl BitIO {
     pub fn write_byte(&mut self, data: u8) {
         for i in 0..8 {
             if data & (1 << i) != 0 {
-                self.write_bit_back(true);
+                self.write_bit_back_to_lsb(true);
             } else {
-                self.write_bit_back(false);
+                self.write_bit_back_to_lsb(false);
             }
         }
     }
+    pub fn write_u16_align_little_endian(&mut self, data: u16) {
+        self.write_byte_align((data & 0xff) as u8);
+        self.write_byte_align(((data & 0xff00) >> 8) as u8);
+    }
     pub fn write_u32_align_little_endian(&mut self, data: u32) {
         self.write_byte_align((data & 0xff) as u8);
-        self.write_byte_align((data & 0xff00) as u8);
-        self.write_byte_align((data & 0xff0000) as u8);
-        self.write_byte_align((data & 0xff000000) as u8);
+        self.write_byte_align(((data & 0xff00) >> 8 ) as u8);
+        self.write_byte_align(((data & 0xff0000) >> 16) as u8);
+        self.write_byte_align(((data & 0xff000000) >> 24) as u8);
     }
     pub fn write_byte_align(&mut self, data: u8) {
-        self.data.push_back(data);
+        // align
+        if self.len % 8 != 0 {
+            self.len += (8 - self.len % 8);
+        }
+
+        self.data.push_back(Self::rev_u8(data));
+        self.len += 8;
     }
 
     pub fn write_code_rev(&mut self, code: &Code) {
         // NOTE: we have to reverse the code before writing
         for i in (0..code.len).rev() {
             if usize::from(code.data) & (1 << i) != 0 {
-                self.write_bit_back(true);
+                self.write_bit_back_to_lsb(true);
             } else {
-                self.write_bit_back(false);
+                self.write_bit_back_to_lsb(false);
             }
         }
     }
 
-    pub fn as_vec(self) -> LinkedList<u8> {
-        self.data
+    pub fn append_bit_io(&mut self, bit_io: &mut BitIO) {
+        while !bit_io.is_empty() {
+            self.write_bit_back_to_lsb(bit_io.read_bit_front().unwrap());
+        }
+    }
+
+    fn rev_u8(data: u8) -> u8 {
+        let s = format!("{data:08b}");
+        let s: String = s.chars().rev().collect();
+        u8::from_str_radix(&s, 2).unwrap()
+    }
+
+    pub fn as_vec_rev(self) -> Vec<u8> {
+        self.data.into_iter().map(|n| Self::rev_u8(n)).collect()
+    }
+    pub fn as_vec(self) -> Vec<u8> {
+        self.data.into_iter().collect()
+    }
+}
+
+pub struct Reader<'a> {
+    buf_reader: &'a [u8],
+    pos: usize,
+}
+impl<'a> Reader<'a> {
+    pub fn new(input: &'a [u8]) -> Self {
+        Self {
+            buf_reader: input,
+            pos: 0,
+        }
+    }
+    pub fn read_u8(&mut self) -> Option<u8> {
+        if self.pos < self.buf_reader.len() {
+            self.pos += 1;
+            Some(self.buf_reader[self.pos - 1])
+        } else {
+            None
+        }
+    }
+    pub fn is_empty(&self) -> bool {
+        self.pos == self.buf_reader.len()
     }
 }
 
 impl fmt::Debug for BitIO {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut len = self.len;
+        writeln!(f, "len {len}").unwrap();
         for n in &self.data {
             let s: String = format!("{:08b}", n).chars().into_iter().rev().collect();
             if len > 8 {
@@ -228,10 +301,10 @@ mod tests {
     #[test]
     fn test_write() {
         let mut handler = BitIO::new(LinkedList::new());
-        handler.write_bit_back(true);
-        handler.write_bit_back(false);
-        handler.write_bit_back(true);
-        handler.write_bit_back(false);
+        handler.write_bit_back_to_lsb(true);
+        handler.write_bit_back_to_lsb(false);
+        handler.write_bit_back_to_lsb(true);
+        handler.write_bit_back_to_lsb(false);
         assert_eq!(handler.len, 4);
         assert_eq!(handler.data.front().unwrap(), &5);
 

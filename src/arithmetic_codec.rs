@@ -77,17 +77,17 @@ impl Codec {
             println!("c: {c} fx_l:{fx_l:?} fx_r:{fx_r:?}, l:{l:?}, u:{u:?} e3_cnt:{e3_cnt}");
             while self.in_e1(l, u) || self.in_e2(l, u) || self.in_e3(l, u) {
                 if self.in_e2(l, u) {
-                    handler.write_bit_back(true);
+                    handler.write_bit_back_to_lsb(true);
                     (l, u) = self.handle_e2(l, u);
                     while e3_cnt > 0 {
-                        handler.write_bit_back(false);
+                        handler.write_bit_back_to_lsb(false);
                         e3_cnt -= 1;
                     }
                 } else if self.in_e1(l, u) {
-                    handler.write_bit_back(false);
+                    handler.write_bit_back_to_lsb(false);
                     (l, u) = self.handle_e1(l, u);
                     while e3_cnt > 0 {
-                        handler.write_bit_back(true);
+                        handler.write_bit_back_to_lsb(true);
                         e3_cnt -= 1;
                     }
                 } else if self.in_e3(l, u) {
@@ -171,10 +171,10 @@ impl Codec {
                 let mut base = 0.5;
                 for _ in 0..self.symbol_size {
                     if val >= base {
-                        handler.write_bit_back(true);
+                        handler.write_bit_back_to_lsb(true);
                         val -= base;
                     } else {
-                        handler.write_bit_back(false);
+                        handler.write_bit_back_to_lsb(false);
                     }
                     base /= 2.0;
                 }
@@ -182,9 +182,9 @@ impl Codec {
             Val::Int(val) => {
                 for i in (0..self.symbol_size).rev() {
                     if val & (1 << i) != 0 {
-                        handler.write_bit_back(true);
+                        handler.write_bit_back_to_lsb(true);
                     } else {
-                        handler.write_bit_back(false);
+                        handler.write_bit_back_to_lsb(false);
                     }
                 }
             }
