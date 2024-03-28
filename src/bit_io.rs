@@ -6,12 +6,30 @@ use std::collections::LinkedList;
 use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 pub struct Code {
-    data: usize,
+    data: Numeric,
     len: u8,
+}
+#[derive(Serialize, Deserialize, Clone, Copy)]
+pub enum Numeric {
+    Usize(usize),
+    U32(u32),
+    U16(u16),
+    U8(u8),
+}
+
+impl From<Numeric> for usize {
+    fn from(value: Numeric) -> Self {
+        match value {
+            Numeric::Usize(v) => v,
+            Numeric::U32(v) => v as usize,
+            Numeric::U16(v) => v as usize,
+            Numeric::U8(v) => v as usize,
+        }
+    }
 }
 
 impl Code {
-    pub fn new(data: usize, len: u8) -> Self {
+    pub fn new(data: Numeric, len: u8) -> Self {
         Self { data, len }
     }
 }
@@ -76,17 +94,37 @@ impl BitIO {
     pub fn write_code(&mut self, code: &Code) {
         // NOTE: we have to reverse the code before writing
         for i in (0..code.len) {
-            if code.data & (1 << i) != 0 {
+            if usize::from(code.data) & (1 << i) != 0 {
                 self.write_bit_back(true);
             } else {
                 self.write_bit_back(false);
             }
         }
     }
+
+    pub fn write_byte(&mut self, data: u8) {
+        for i in 0..8 {
+            if data & (1 << i) != 0 {
+                self.write_bit_back(true);
+            } else {
+                self.write_bit_back(false);
+            }
+        }
+    }
+    pub fn write_u32_align_little_endian(&mut self, data: u32) {
+        self.write_byte_align((data & 0xff) as u8);
+        self.write_byte_align((data & 0xff00) as u8);
+        self.write_byte_align((data & 0xff0000) as u8);
+        self.write_byte_align((data & 0xff000000) as u8);
+    }
+    pub fn write_byte_align(&mut self, data: u8) {
+        self.data.push_back(data);
+    }
+
     pub fn write_code_rev(&mut self, code: &Code) {
         // NOTE: we have to reverse the code before writing
         for i in (0..code.len).rev() {
-            if code.data & (1 << i) != 0 {
+            if usize::from(code.data) & (1 << i) != 0 {
                 self.write_bit_back(true);
             } else {
                 self.write_bit_back(false);
@@ -118,7 +156,7 @@ impl fmt::Debug for BitIO {
 
 impl fmt::Debug for Code {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s: String = format!("{:032b}", self.data)
+        let s: String = format!("{:032b}", usize::from(self.data))
             .chars()
             .into_iter()
             .rev()
@@ -135,9 +173,18 @@ mod tests {
     #[test]
     fn test_read_front() {
         let mut handler = BitIO::new(LinkedList::new());
-        handler.write_code(&Code { data: 97, len: 8 }); //
-        handler.write_code(&Code { data: 229, len: 8 }); // 10100111
-        handler.write_code(&Code { data: 1, len: 1 }); // 10100111
+        handler.write_code(&Code {
+            data: Numeric::Usize(97),
+            len: 8,
+        }); //
+        handler.write_code(&Code {
+            data: Numeric::Usize(229),
+            len: 8,
+        }); // 10100111
+        handler.write_code(&Code {
+            data: Numeric::Usize(1),
+            len: 1,
+        }); // 10100111
         assert_eq!(handler.read_bit_front().unwrap(), true);
         assert_eq!(handler.read_bit_front().unwrap(), false);
         assert_eq!(handler.read_bit_front().unwrap(), false);

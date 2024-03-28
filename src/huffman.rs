@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_cbor::{from_slice, ser::to_vec_packed};
 
 use crate::{
-    bit_io::{BitIO, Code},
+    bit_io::{BitIO, Code, Numeric},
     utils::freq_of_str,
 };
 
@@ -147,7 +147,7 @@ impl Codec {
         if let Some(node) = node {
             match node.symbol {
                 Some(symbol) => {
-                    map.insert(symbol, Code::new(code, depth));
+                    map.insert(symbol, Code::new(Numeric::Usize(code), depth));
                 }
                 None => {
                     Self::pollute_symbol_map(&node.left, map, depth + 1, code);

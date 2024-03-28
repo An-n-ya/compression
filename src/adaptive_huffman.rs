@@ -11,7 +11,7 @@ use std::{
 use serde::{de, Serialize};
 
 use crate::{
-    bit_io::{BitIO, Code},
+    bit_io::{BitIO, Code, Numeric},
     graph_viz::GraphViz,
 };
 struct HuffNode {
@@ -358,7 +358,7 @@ impl Codec {
             a = a.parent();
         }
 
-        let code = Code::new(path, depth);
+        let code = Code::new(Numeric::Usize(path), depth);
 
         code
     }
@@ -366,7 +366,7 @@ impl Codec {
     fn code_from_symbol(&self, symbol: char) -> Code {
         // TODO: we should use utf8 encoding, instead of u32
         // char to bytes: https://github.com/rust-lang/rust/blob/9cc0b2247509d61d6a246a5c5ad67f84b9a2d8b6/src/libcore/char.rs#L220
-        Code::new(symbol as u32 as usize, 32u8)
+        Code::new(Numeric::Usize(symbol as u32 as usize), 32u8)
     }
 
     fn new_node(&mut self, symbol: char) -> Node {
