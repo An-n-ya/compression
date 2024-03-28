@@ -17,13 +17,13 @@ impl Code {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct BitHandler {
+pub struct BitIO {
     data: LinkedList<u8>,
     len: usize,
     read: u8,
 }
 
-impl BitHandler {
+impl BitIO {
     pub fn new(data: LinkedList<u8>) -> Self {
         let len = data.len() * 8;
         Self { data, len, read: 0 }
@@ -99,7 +99,7 @@ impl BitHandler {
     }
 }
 
-impl fmt::Debug for BitHandler {
+impl fmt::Debug for BitIO {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut len = self.len;
         for n in &self.data {
@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn test_read_front() {
-        let mut handler = BitHandler::new(LinkedList::new());
+        let mut handler = BitIO::new(LinkedList::new());
         handler.write_code(&Code { data: 97, len: 8 }); //
         handler.write_code(&Code { data: 229, len: 8 }); // 10100111
         handler.write_code(&Code { data: 1, len: 1 }); // 10100111
@@ -159,7 +159,7 @@ mod tests {
     }
     #[test]
     fn test_read() {
-        let mut handler = BitHandler {
+        let mut handler = BitIO {
             data: LinkedList::from_iter(vec![0, 5]),
             len: 11,
             read: 0,
@@ -180,7 +180,7 @@ mod tests {
 
     #[test]
     fn test_write() {
-        let mut handler = BitHandler::new(LinkedList::new());
+        let mut handler = BitIO::new(LinkedList::new());
         handler.write_bit_back(true);
         handler.write_bit_back(false);
         handler.write_bit_back(true);

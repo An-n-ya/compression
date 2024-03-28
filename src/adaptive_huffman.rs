@@ -11,7 +11,7 @@ use std::{
 use serde::{de, Serialize};
 
 use crate::{
-    bit_writer::{BitHandler, Code},
+    bit_io::{BitIO, Code},
     graph_viz::GraphViz,
 };
 struct HuffNode {
@@ -238,7 +238,7 @@ impl Codec {
         }
     }
 
-    pub fn write_symbol(&mut self, symbol: char, handler: &mut BitHandler) {
+    pub fn write_symbol(&mut self, symbol: char, handler: &mut BitIO) {
         if self.symbol_map.contains_key(&symbol) {
             let node = self.symbol_map.get(&symbol).unwrap().clone();
             let code = Self::code_from_node(node.clone());
@@ -265,8 +265,8 @@ impl Codec {
         }
     }
 
-    pub fn encode(&mut self, input: &String) -> BitHandler {
-        let mut handler = BitHandler::new(LinkedList::new());
+    pub fn encode(&mut self, input: &String) -> BitIO {
+        let mut handler = BitIO::new(LinkedList::new());
         #[cfg(test)]
         let mut file = File::create("tree.dot").unwrap();
         #[cfg(test)]
@@ -288,7 +288,7 @@ impl Codec {
         handler
     }
 
-    pub fn decode(&mut self, handler: &mut BitHandler) -> String {
+    pub fn decode(&mut self, handler: &mut BitIO) -> String {
         let mut res = "".to_string();
         let mut node = self.root.clone();
         let mut path = "".to_string();

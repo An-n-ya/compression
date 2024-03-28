@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_cbor::{from_slice, ser::to_vec_packed};
 
 use crate::{
-    bit_writer::{BitHandler, Code},
+    bit_io::{BitIO, Code},
     utils::freq_of_str,
 };
 
@@ -56,7 +56,7 @@ impl Codec {
         }
     }
 
-    pub fn encode(&mut self, input: &String) -> BitHandler {
+    pub fn encode(&mut self, input: &String) -> BitIO {
         let freq = freq_of_str(&input);
         // get frequency of each char
         let symbol_size = freq.len();
@@ -76,7 +76,7 @@ impl Codec {
         Self::pollute_symbol_map(&self.root, &mut self.symbol_map, 0, 0);
 
         // write to res
-        let mut writer = BitHandler::new(LinkedList::new());
+        let mut writer = BitIO::new(LinkedList::new());
         input.chars().for_each(|c| {
             writer.write_code_rev(self.symbol_map.get(&c).expect("get code from symbol_map"));
         });
@@ -87,7 +87,7 @@ impl Codec {
         writer
     }
 
-    pub fn decode(&self, input: &mut BitHandler) -> String {
+    pub fn decode(&self, input: &mut BitIO) -> String {
         assert!(self.root.is_some());
         let mut a = self.root.as_ref().unwrap().as_ref();
         let mut res = "".to_string();
@@ -106,7 +106,7 @@ impl Codec {
         res.chars().into_iter().rev().collect()
     }
 
-    pub fn persist_to_file(&self, output: &BitHandler) {
+    pub fn persist_to_file(&self, output: &BitIO) {
         let mut file = File::create("compression.huff").unwrap();
         let mut header = to_vec_packed(&self.root).unwrap();
         let mut header_len: Vec<u8> = format!("{}", header.len())
@@ -138,7 +138,7 @@ impl Codec {
         };
         let mut data: Vec<u8> = vec![];
         file.read_to_end(&mut data);
-        let mut data: BitHandler = from_slice(&data).unwrap();
+        let mut data: BitIO = from_slice(&data).unwrap();
         let res = codec.decode(&mut data);
         res
     }

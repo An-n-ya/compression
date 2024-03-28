@@ -6,7 +6,7 @@ use std::{
     ops::Add,
 };
 
-use crate::{bit_writer::BitHandler, utils::freq_of_str};
+use crate::{bit_io::BitIO, utils::freq_of_str};
 pub struct Codec {
     symbol_size: usize,
     freq: Vec<(char, Val)>,
@@ -57,7 +57,7 @@ impl Codec {
         }
     }
 
-    pub fn encode(&self, input: &str) -> BitHandler {
+    pub fn encode(&self, input: &str) -> BitIO {
         let (mut l, mut u) = if self.total_cnt.is_some() {
             (Val::Int(0), Val::Int((1 << self.symbol_size) - 1))
         } else {
@@ -66,7 +66,7 @@ impl Codec {
         let fx = Fx::new(&self.freq);
         let mut cur_index = 0;
         let input: Vec<char> = input.chars().collect();
-        let mut handler = BitHandler::new(LinkedList::new());
+        let mut handler = BitIO::new(LinkedList::new());
         let mut e3_cnt = 0;
         while cur_index < input.len() {
             let c = input[cur_index];
@@ -105,7 +105,7 @@ impl Codec {
 
         handler
     }
-    fn decode(&self, handler: BitHandler) -> String {
+    fn decode(&self, handler: BitIO) -> String {
         let mut reader = NumReader::new(self.symbol_size, handler, self.total_cnt.is_some());
         let (mut l, mut u) = if self.total_cnt.is_some() {
             (Val::Int(0), Val::Int((1 << self.symbol_size) - 1))
@@ -164,7 +164,7 @@ impl Codec {
         res
     }
 
-    fn write_end(&self, handler: &mut BitHandler, end: Val) {
+    fn write_end(&self, handler: &mut BitIO, end: Val) {
         match end {
             Val::Float(val) => {
                 let mut val = val;
@@ -313,11 +313,11 @@ impl Codec {
 struct NumReader {
     symbol_size: usize,
     cur_val: Val,
-    handler: BitHandler,
+    handler: BitIO,
 }
 
 impl NumReader {
-    pub fn new(symbol_size: usize, mut handler: BitHandler, is_int: bool) -> Self {
+    pub fn new(symbol_size: usize, mut handler: BitIO, is_int: bool) -> Self {
         let cur_val = if !is_int {
             let mut cur_val = 0f64;
             let mut base = 1.0;
