@@ -136,26 +136,26 @@ impl BlockType {
         match self {
             BlockType::NoCompression { len } => {
                 // 00
-                bit_io.write_bit_back_to_msb(false);
-                bit_io.write_bit_back_to_msb(false);
+                bit_io.write_bit_back(false);
+                bit_io.write_bit_back(false);
                 let n_len = !len;
                 bit_io.write_u16_align_little_endian(*len);
                 bit_io.write_u16_align_little_endian(n_len);
             }
             BlockType::FixedHuffCompression => {
                 // 01
-                bit_io.write_bit_back_to_msb(true);
-                bit_io.write_bit_back_to_msb(false);
+                bit_io.write_bit_back(true);
+                bit_io.write_bit_back(false);
             }
             BlockType::DynamicHuffCompression => {
                 // 10
-                bit_io.write_bit_back_to_msb(false);
-                bit_io.write_bit_back_to_msb(true);
+                bit_io.write_bit_back(false);
+                bit_io.write_bit_back(true);
             }
             BlockType::Error => {
                 // 11
-                bit_io.write_bit_back_to_msb(true);
-                bit_io.write_bit_back_to_msb(true);
+                bit_io.write_bit_back(true);
+                bit_io.write_bit_back(true);
             }
         }
     }
@@ -164,9 +164,9 @@ impl BlockType {
 impl Block {
     pub fn write(&mut self, bit_io: &mut BitIO) {
         if self.is_final {
-            bit_io.write_bit_back_to_msb(true);
+            bit_io.write_bit_back(true);
         } else {
-            bit_io.write_bit_back_to_msb(false);
+            bit_io.write_bit_back(false);
         }
         self._type.write(bit_io);
         bit_io.append_bit_io(&mut self.data);
@@ -199,13 +199,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_no_compression() {
+    fn test_deflate_no_compression() {
         let n = GZip::deflate(b"h");
         println!("{n:?}");
 
-        let data = n.as_vec_rev();
+        let data = n.as_vec();
         fs::write("no_compression.gz", data);
-
-        panic!()
     }
 }

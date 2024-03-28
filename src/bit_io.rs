@@ -79,19 +79,7 @@ impl BitIO {
         Some(res)
     }
 
-    pub fn write_bit_back_to_msb(&mut self, bit: bool) {
-        if self.len % 8 == 0 {
-            self.data.push_back(0);
-        }
-        if bit {
-            let offset = 7 - self.len % 8;
-            let top = self.data.pop_back().unwrap();
-            self.data.push_back(top | (1 << offset));
-        }
-        self.len += 1;
-    }
-
-    pub fn write_bit_back_to_lsb(&mut self, bit: bool) {
+    pub fn write_bit_back(&mut self, bit: bool) {
         if self.len % 8 == 0 {
             self.data.push_back(0);
         }
@@ -103,24 +91,13 @@ impl BitIO {
         self.len += 1;
     }
 
-    pub fn write_code_to_msb(&mut self, code: &Code) {
-        // NOTE: we have to reverse the code before writing
-        for i in (0..code.len).rev() {
-            if usize::from(code.data) & (1 << i) != 0 {
-                self.write_bit_back_to_msb(true);
-            } else {
-                self.write_bit_back_to_msb(false);
-            }
-        }
-    }
-
     pub fn write_code(&mut self, code: &Code) {
         // NOTE: we have to reverse the code before writing
         for i in (0..code.len) {
             if usize::from(code.data) & (1 << i) != 0 {
-                self.write_bit_back_to_lsb(true);
+                self.write_bit_back(true);
             } else {
-                self.write_bit_back_to_lsb(false);
+                self.write_bit_back(false);
             }
         }
     }
@@ -128,9 +105,9 @@ impl BitIO {
     pub fn write_byte(&mut self, data: u8) {
         for i in 0..8 {
             if data & (1 << i) != 0 {
-                self.write_bit_back_to_lsb(true);
+                self.write_bit_back(true);
             } else {
-                self.write_bit_back_to_lsb(false);
+                self.write_bit_back(false);
             }
         }
     }
@@ -140,7 +117,7 @@ impl BitIO {
     }
     pub fn write_u32_align_little_endian(&mut self, data: u32) {
         self.write_byte_align((data & 0xff) as u8);
-        self.write_byte_align(((data & 0xff00) >> 8 ) as u8);
+        self.write_byte_align(((data & 0xff00) >> 8) as u8);
         self.write_byte_align(((data & 0xff0000) >> 16) as u8);
         self.write_byte_align(((data & 0xff000000) >> 24) as u8);
     }
@@ -150,7 +127,7 @@ impl BitIO {
             self.len += (8 - self.len % 8);
         }
 
-        self.data.push_back(Self::rev_u8(data));
+        self.data.push_back(data);
         self.len += 8;
     }
 
@@ -158,16 +135,16 @@ impl BitIO {
         // NOTE: we have to reverse the code before writing
         for i in (0..code.len).rev() {
             if usize::from(code.data) & (1 << i) != 0 {
-                self.write_bit_back_to_lsb(true);
+                self.write_bit_back(true);
             } else {
-                self.write_bit_back_to_lsb(false);
+                self.write_bit_back(false);
             }
         }
     }
 
     pub fn append_bit_io(&mut self, bit_io: &mut BitIO) {
         while !bit_io.is_empty() {
-            self.write_bit_back_to_lsb(bit_io.read_bit_front().unwrap());
+            self.write_bit_back(bit_io.read_bit_front().unwrap());
         }
     }
 
@@ -301,10 +278,10 @@ mod tests {
     #[test]
     fn test_write() {
         let mut handler = BitIO::new(LinkedList::new());
-        handler.write_bit_back_to_lsb(true);
-        handler.write_bit_back_to_lsb(false);
-        handler.write_bit_back_to_lsb(true);
-        handler.write_bit_back_to_lsb(false);
+        handler.write_bit_back(true);
+        handler.write_bit_back(false);
+        handler.write_bit_back(true);
+        handler.write_bit_back(false);
         assert_eq!(handler.len, 4);
         assert_eq!(handler.data.front().unwrap(), &5);
 
